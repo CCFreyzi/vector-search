@@ -1,170 +1,236 @@
-import React, { useEffect, useMemo, useState } from "react";
-import DataTable from "datatables.net-react";
-import DT from "datatables.net-dt";
+import * as React from "react";
+import PropTypes from "prop-types";
+import { alpha } from "@mui/material/styles";
+import Box from "@mui/material/Box";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableContainer from "@mui/material/TableContainer";
+import TableHead from "@mui/material/TableHead";
+import TablePagination from "@mui/material/TablePagination";
+import TableRow from "@mui/material/TableRow";
+import TableSortLabel from "@mui/material/TableSortLabel";
+import Toolbar from "@mui/material/Toolbar";
+import Typography from "@mui/material/Typography";
+import Paper from "@mui/material/Paper";
+import { visuallyHidden } from "@mui/utils";
 import { useResult } from "../../context/ResultContext";
-import { Box, CircularProgress } from "@mui/material";
-import RangeSlider from "../inputs/price-input";
-import "../../index.css";
+import Loader from "../Loader";
+import RangePrice from "../RangePrice";
+import DateRangeFilter from "../DateFilter";
+import ResetFiltersButton from "../ResetFiltersButton";
+import { sx } from "./styles";
+import { formatDate } from "../../utils/format-date";
 
-DataTable.use(DT);
+function descendingComparator(a, b, orderBy) {
+    if (b[orderBy] < a[orderBy]) return -1;
+    if (b[orderBy] > a[orderBy]) return 1;
+    return 0;
+}
 
-const monthsShort = {
-  "01": "січ.",
-  "02": "лют.",
-  "03": "бер.",
-  "04": "квіт.",
-  "05": "трав.",
-  "06": "черв.",
-  "07": "лип.",
-  "08": "серп.",
-  "09": "вер.",
-  10: "жовт.",
-  11: "лист.",
-  12: "груд.",
-};
+function getComparator(order, orderBy) {
+    return order === "desc" ? (a, b) => descendingComparator(a, b, orderBy) : (a, b) => -descendingComparator(a, b, orderBy);
+}
 
-const formatDateDisplay = (dateString) => {
-  if (!dateString) return "";
-  const [datePart] = dateString.split(" ");
-  const [year, month, day] = datePart.split("-");
-  return `${parseInt(day, 10)} ${monthsShort[month]} ${year}`;
-};
+const headCells = [
+    { id: "tovar_name", numeric: false, disablePadding: true, label: "Товар" },
+    {
+        id: "name_tovar_1C",
+        numeric: false,
+        disablePadding: false,
+        label: "Товар 1С",
+    },
+    { id: "name", numeric: false, disablePadding: false, label: "Постачальник" },
+    { id: "costs", numeric: true, disablePadding: false, label: "Вартість (₴)" },
+    {
+        id: "costs_NDS",
+        numeric: true,
+        disablePadding: false,
+        label: "Вартість з ПДВ (₴)",
+    },
+    {
+        id: "date_prihod",
+        numeric: false,
+        disablePadding: false,
+        label: "Дата приходу",
+    },
+];
 
-const formatPrice = (price) => {
-  if (!price) return "0,00";
-  return Number(price).toFixed(2).replace(".", ",");
-};
-
-const ResultGrid = () => {
-  const { results, loading } = useResult();
-
-  const [minPrice, setMinPrice] = useState(0);
-  const [maxPrice, setMaxPrice] = useState(0);
-  const [priceRange, setPriceRange] = useState([0, 0]);
-  const [filteredResults, setFilteredResults] = useState([]);
-
-  useEffect(() => {
-    if (!results || results.length === 0) return;
-
-    const prices = results.map((item) => Math.floor(item.costs));
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
-
-    setMinPrice(min);
-    setMaxPrice(max);
-    setPriceRange([min, max]);
-    setFilteredResults(results);
-  }, [results]);
-
-  const handleSliderChange = ([min, max]) => {
-    setPriceRange([min, max]);
-    const filtered = results.filter(
-      (item) => item.costs >= min && item.costs <= max
-    );
-    setFilteredResults(filtered);
-  };
-
-  const columns = useMemo(
-    () => [
-      { title: "Товар", data: "tovar_name", className: "product-column" },
-      { title: "Товар 1С", data: "name_tovar_1C", className: "product-1c-column" },
-      { title: "Постачальник", data: "name", className: "supplier-column" },
-      { title: "Вартість (₴)", data: "costs", className: "price-column" },
-      { title: "Вартість з ПДВ (₴)", data: "costs_NDS", className: "price-column" },
-      {
-        title: "Дата приходу",
-        data: "date_prihod",
-        render: (data, type) => {
-          if (type === "display") return formatDateDisplay(data);
-          return data ? new Date(data.split(" ")[0]).getTime() : 0;
-        },
-        type: "num",
-      },
-    ],
-    []
-  );
-
-  const dataWithIndex = useMemo(() => {
-    return (filteredResults || []).map((item) => ({
-      ...item,
-      costs: formatPrice(item.costs),
-      costs_NDS: formatPrice(item.costs_NDS),
-    }));
-  }, [filteredResults]);
-
-  if (loading) {
+const formatPrice = (value) => {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          flexDirection: "column",
-          height: "100vh",
-          gap: "30px",
-        }}
-      >
-        <CircularProgress />
-        <p>
-          ШІ думає над відповіддю 🤖 Це може зайняти ще кілька секунд. Дякуємо
-          за очікування
-        </p>
-      </Box>
+        new Intl.NumberFormat("en-US", {
+            style: "decimal",
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(value) + "₴"
     );
-  }
+};
 
-  if (!results || results.length === 0) {
+function EnhancedTableHead({ onSelectAllClick, order, orderBy, numSelected, rowCount, onRequestSort }) {
+    const createSortHandler = (property) => (event) => onRequestSort(event, property);
+
     return (
-      <div style={{ textAlign: "center", padding: "20px" }}>
-        Введіть пошуковий запит.
-      </div>
+        <TableHead>
+            <TableRow>
+                {headCells.map((headCell) => (
+                    <TableCell
+                        key={headCell.id}
+                        sx={{
+                            padding: "12px 10px",
+                            "border-top": "1px solid #d1d5db",
+                            fontWeight: "bold",
+                            fontSize: "16px",
+                            ...(headCell.id === "tovar_name" && { width: "22%" }),
+                            ...(headCell.id === "name_tovar_1C" && { width: "22%" }),
+                            ...(headCell.id === "name" && { width: "22.5%" }),
+                            ...(headCell.id === "costs" && { width: "13%" }),
+                            ...(headCell.id === "costs_NDS" && { width: "10.5%" }),
+                            ...(headCell.id === "date_prihod" && { width: "10%" }),
+                        }}
+                        align={headCell.numeric ? "right" : "left"}
+                        padding={headCell.disablePadding ? "none" : "normal"}
+                        sortDirection={orderBy === headCell.id ? order : false}
+                    >
+                        <TableSortLabel active={orderBy === headCell.id} direction={orderBy === headCell.id ? order : "asc"} onClick={createSortHandler(headCell.id)}>
+                            {headCell.label}
+                            {orderBy === headCell.id && (
+                                <Box component="span" sx={visuallyHidden}>
+                                    {order === "desc" ? "sorted descending" : "sorted ascending"}
+                                </Box>
+                            )}
+                        </TableSortLabel>
+                    </TableCell>
+                ))}
+            </TableRow>
+        </TableHead>
     );
-  }
+}
 
-  return (
-    <Box sx={{ padding: 2 }}>
-      {minPrice !== maxPrice && maxPrice !== 0 && (
-        <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
-          <RangeSlider
-            minPrice={minPrice}
-            maxPrice={maxPrice}
-            value={priceRange}
-            onChange={handleSliderChange}
-          />
+EnhancedTableHead.propTypes = {
+    numSelected: PropTypes.number.isRequired,
+    onRequestSort: PropTypes.func.isRequired,
+    onSelectAllClick: PropTypes.func.isRequired,
+    order: PropTypes.oneOf(["asc", "desc"]).isRequired,
+    orderBy: PropTypes.string.isRequired,
+    rowCount: PropTypes.number.isRequired,
+};
+
+function EnhancedTableToolbar({ numSelected }) {
+    return (
+        <Toolbar
+            sx={[
+                {
+                    // pl: { sm: 2 },
+                    // pr: { xs: 1, sm: 1 },
+                    p: "14px 8px  !important",
+                },
+                numSelected > 0 && {
+                    bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.action.activatedOpacity),
+                },
+            ]}
+        >
+            {numSelected > 0 ? (
+                <Typography sx={{ flex: "1 1 100%" }} color="inherit" variant="subtitle1" component="div">
+                    {numSelected} selected
+                </Typography>
+            ) : (
+                <Typography sx={{ flex: "1 1 100%", fontWeight: "bold", fontSize: 18 }} variant="h6" id="tableTitle" component="div">
+                    Результати пошуку
+                </Typography>
+            )}
+
+            <Typography sx={sx.controlFilter} variant="h6" id="tableTitle" component="div">
+                <RangePrice />
+                <DateRangeFilter />
+                <ResetFiltersButton />
+            </Typography>
+        </Toolbar>
+    );
+}
+
+EnhancedTableToolbar.propTypes = {
+    numSelected: PropTypes.number.isRequired,
+};
+
+export default function ResultGrid() {
+    const { filteredResults, originalResults, filters, loading } = useResult();
+    const [order, setOrder] = React.useState("desc");
+    const [orderBy, setOrderBy] = React.useState("date_prihod");
+    const [selected, setSelected] = React.useState([]);
+    const [page, setPage] = React.useState(0);
+    const [rowsPerPage, setRowsPerPage] = React.useState(10);
+
+    React.useEffect(() => {
+        setPage(0);
+    }, [filteredResults]);
+
+    const hasActiveFilters = filters.priceRange !== null || filters.dateRange !== null || filters.useNDS !== true;
+
+    const displayData = hasActiveFilters ? filteredResults : originalResults;
+
+    const handleRequestSort = (event, property) => {
+        const isAsc = orderBy === property && order === "asc";
+        setOrder(isAsc ? "desc" : "asc");
+        setOrderBy(property);
+        console.log(property);
+    };
+
+    const handleSelectAllClick = (event) => {
+        if (event.target.checked) {
+            const newSelected = displayData.map((n, index) => index);
+            setSelected(newSelected);
+            return;
+        }
+        setSelected([]);
+    };
+
+    const handleChangePage = (event, newPage) => setPage(newPage);
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
+    const visibleRows = React.useMemo(
+        () =>
+            [...displayData]
+                .map((item, index) => ({ ...item, __index: index }))
+                .sort(getComparator(order, orderBy))
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
+        [order, orderBy, page, rowsPerPage, displayData]
+    );
+
+    return loading ? (
+        <Loader />
+    ) : originalResults.length === 0 ? (
+        ""
+    ) : (
+        // <span>Введить пошуковий запит</span>
+        <Box sx={{ width: "100%" }}>
+            <Paper sx={{ width: "100%", mb: 2, border: "1px solid #d1d5db" }}>
+                <EnhancedTableToolbar numSelected={selected.length} />
+                <TableContainer>
+                    <Table sx={{ minWidth: 750 }} aria-labelledby="tableTitle" size={"medium"}>
+                        <EnhancedTableHead numSelected={selected.length} order={order} orderBy={orderBy} onSelectAllClick={handleSelectAllClick} onRequestSort={handleRequestSort} rowCount={displayData.length} />
+                        <TableBody>
+                            {visibleRows.map((row, index) => (
+                                <TableRow key={row.__index} sx={index % 2 == 0 ? { background: "#eee" } : { background: "#fff" }} hover>
+                                    <TableCell component="th" scope="row" sx={{ paddingLeft: "10px" }}>
+                                        {row.tovar_name}
+                                    </TableCell>
+                                    <TableCell align="left">{row.name_tovar_1C}</TableCell>
+                                    <TableCell align="left">{row.name}</TableCell>
+                                    <TableCell align="right">{formatPrice(row.costs)}</TableCell>
+                                    <TableCell align="right">{formatPrice(row.costs_NDS)}</TableCell>
+
+                                    <TableCell align="left">{formatDate(row.date_prihod)}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+                <TablePagination rowsPerPageOptions={[10, 25, 50, 100]} component="div" count={displayData.length} rowsPerPage={rowsPerPage} page={page} onPageChange={handleChangePage} onRowsPerPageChange={handleChangeRowsPerPage} labelRowsPerPage="Кількість рядків на сторінці" labelDisplayedRows={({ from, to, count }) => `${from}–${to} із ${count}`} />
+            </Paper>
         </Box>
-      )}
-
-      <DataTable
-        data={dataWithIndex}
-        columns={columns}
-        className="display"
-        theme="dark"
-        options={{
-          dom: 'lrtip',
-          order: [[5, "desc"]],
-          language: {
-            search: "Пошук:",
-            zeroRecords: "Нічого не знайдено. Спробуйте змінити запит.",
-            lengthMenu: "Показати _MENU_ записів на сторінку",
-            info: "Показано сторінку _PAGE_ з _PAGES_",
-            infoEmpty: "Немає записів для відображення",
-            infoFiltered: "(відфільтровано з _MAX_ записів)",
-          },
-        }}
-      >
-        <thead>
-          <tr>
-            <th>Товар</th>
-            <th>Товар 1С</th>
-            <th>Постачальник</th>
-            <th>Вартість (₴)</th>
-            <th>Вартість з ПДВ (₴)</th>
-            <th>Дата приходу</th>
-          </tr>
-        </thead>
-      </DataTable>
-    </Box>
-  );
-};
-
-export default ResultGrid;
+    );
+}
