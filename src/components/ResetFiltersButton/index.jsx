@@ -10,7 +10,8 @@ export default function ResetFiltersButton() {
   const isActive =
     filters.priceRange !== null ||
     filters.dateRange !== null ||
-    filters.useNDS !== true;
+    filters.useNDS !== true ||
+    filters.manufacturers !== null;
 
   const handleReset = () => {
     if (!isActive) return;
@@ -18,6 +19,7 @@ export default function ResetFiltersButton() {
     setFilters({
       priceRange: null,
       dateRange: null,
+      manufacturers: null,
       useNDS: true,
     });
   };

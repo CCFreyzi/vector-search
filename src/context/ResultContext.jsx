@@ -8,6 +8,7 @@ export const ResultProvider = ({ children }) => {
     const [filters, setFilters] = useState({
         priceRange: null,
         dateRange: null,
+        manufacturers: null,
         useNDS: true,
     });
     const [loading, setLoading] = useState(false);
@@ -37,18 +38,28 @@ export const ResultProvider = ({ children }) => {
             });
         }
 
+        if (customFilters.manufacturers) {
+            data = data.filter((item) => 
+                customFilters.manufacturers.includes(item.name)
+            );
+        }
+
         setFilteredResults(data);
     };
 
-    useEffect(() => {
-        const hasActiveFilters = filters.priceRange !== null || filters.dateRange !== null || filters.useNDS !== true;
+    useEffect(() => {        
+        const hasActiveFilters = 
+            filters.priceRange !== null || 
+            filters.dateRange !== null || 
+            filters.manufacturers !== null || 
+            filters.useNDS !== true;
 
         if (hasActiveFilters) {
             applyFilters(filters);
         } else {
-            setFilteredResults([]);
+            setFilteredResults(originalResults);
         }
-    }, [filters]);
+    }, [filters, originalResults]);
 
     return (
         <ResultContext.Provider
