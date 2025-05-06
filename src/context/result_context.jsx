@@ -5,6 +5,7 @@ const ResultContext = createContext();
 export const ResultProvider = ({ children }) => {
     const [originalResults, setOriginalResults] = useState([]);
     const [filteredResults, setFilteredResults] = useState([]);
+    const [isSearched, setSearched] = useState(false);
     const [filters, setFilters] = useState({
         priceRange: null,
         dateRange: null,
@@ -16,6 +17,7 @@ export const ResultProvider = ({ children }) => {
     const updateResults = (data) => {
         setOriginalResults(data);
         setFilteredResults(data);
+        setSearched(true);
     };
 
     const applyFilters = (customFilters = filters) => {
@@ -39,20 +41,14 @@ export const ResultProvider = ({ children }) => {
         }
 
         if (customFilters.manufacturers) {
-            data = data.filter((item) => 
-                customFilters.manufacturers.includes(item.name)
-            );
+            data = data.filter((item) => customFilters.manufacturers.includes(item.name));
         }
 
         setFilteredResults(data);
     };
 
-    useEffect(() => {        
-        const hasActiveFilters = 
-            filters.priceRange !== null || 
-            filters.dateRange !== null || 
-            filters.manufacturers !== null || 
-            filters.useNDS !== true;
+    useEffect(() => {
+        const hasActiveFilters = filters.priceRange !== null || filters.dateRange !== null || filters.manufacturers !== null || filters.useNDS !== true;
 
         if (hasActiveFilters) {
             applyFilters(filters);
@@ -67,6 +63,7 @@ export const ResultProvider = ({ children }) => {
                 originalResults,
                 filteredResults,
                 loading,
+                isSearched,
                 setLoading,
                 updateResults,
                 filters,

@@ -2,7 +2,7 @@ import React from "react";
 import Button from "@mui/material/Button";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import { useResult } from "../../context/ResultContext";
+import { useResult } from "../../context/result_context";
 
 export default function ResetFiltersButton() {
   const { setFilters, filters } = useResult();
@@ -39,7 +39,7 @@ export default function ResetFiltersButton() {
         width: "100px",
         marginTop: "auto",
         marginLeft: "-32px",
-        marginBottom: "5px",
+        marginBottom: "6px",
       }}
     >
       {" "}

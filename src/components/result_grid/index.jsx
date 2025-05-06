@@ -14,14 +14,15 @@ import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import Paper from "@mui/material/Paper";
 import { visuallyHidden } from "@mui/utils";
-import { useResult } from "../../context/ResultContext";
-import Loader from "../Loader";
-import RangePrice from "../RangePrice";
-import DateRangeFilter from "../DateFilter";
-import ProducerFilter from "../ProducerFilter";
-import ResetFiltersButton from "../ResetFiltersButton";
+import { useResult } from "../../context/result_context";
+import Loader from "../loader";
+import RangePrice from "../range_price";
+import DateRangeFilter from "../date_filter";
+import ProducerFilter from "../producer_filter";
+import ResetFiltersButton from "../reset_filters_button";
 import { sx } from "./styles";
 import { formatDate } from "../../utils/format-date";
+import mixpanel from "mixpanel-browser";
 
 function descendingComparator(a, b, orderBy) {
   if (b[orderBy] < a[orderBy]) return -1;
@@ -135,8 +136,6 @@ function EnhancedTableToolbar({ numSelected }) {
     <Toolbar
       sx={[
         {
-          // pl: { sm: 2 },
-          // pr: { xs: 1, sm: 1 },
           p: "14px 8px  !important",
         },
         numSelected > 0 && {
@@ -159,9 +158,6 @@ function EnhancedTableToolbar({ numSelected }) {
         </Typography>
       ) : (
         ""
-        // <Typography sx={{ flex: "1 1 100%", fontWeight: "bold", fontSize: 18 }} variant="h6" id="tableTitle" component="div">
-        //     Результати пошуку
-        // </Typography>
       )}
 
       <Typography
@@ -184,7 +180,8 @@ EnhancedTableToolbar.propTypes = {
 };
 
 export default function ResultGrid() {
-  const { filteredResults, originalResults, filters, loading } = useResult();
+  const { filteredResults, originalResults, filters, loading, isSearched } =
+    useResult();
   const [order, setOrder] = React.useState("desc");
   const [orderBy, setOrderBy] = React.useState("date_prihod");
   const [selected, setSelected] = React.useState([]);
@@ -213,6 +210,10 @@ export default function ResultGrid() {
     if (!sortedColumnsRef.current.has(property)) {
       console.log(`User sorted by column: ${property}`);
       sortedColumnsRef.current.add(property);
+      mixpanel.track("useSort", {
+        sortName: property,
+        timestamp: new Date().toISOString(),
+      });
     }
   };
 
@@ -241,12 +242,54 @@ export default function ResultGrid() {
     [order, orderBy, page, rowsPerPage, displayData]
   );
 
-  return loading ? (
-    <Loader />
-  ) : originalResults.length === 0 ? (
-    ""
-  ) : (
-    // <span>Введить пошуковий запит</span>
+  // return loading ? (
+  //     <Loader />
+  // ) : displayData.length > 0 ? (
+  //     <Box sx={{ width: "100%" }}>
+  //         <Paper sx={{ width: "100%", mb: 2, border: "1px solid #d1d5db" }}>
+  //             <EnhancedTableToolbar numSelected={selected.length} />
+  //             <TableContainer>
+  //                 <Table sx={{ minWidth: 750 }} aria-labelledby="tableTitle" size={"medium"}>
+  //                     <EnhancedTableHead numSelected={selected.length} order={order} orderBy={orderBy} onSelectAllClick={handleSelectAllClick} onRequestSort={handleRequestSort} rowCount={displayData.length} />
+  //                     <TableBody>
+  //                         {visibleRows.map((row, index) => (
+  //                             <TableRow key={row.__index} sx={index % 2 === 0 ? { background: "#eee" } : { background: "#fff" }} hover>
+  //                                 <TableCell component="th" scope="row" sx={{ paddingLeft: "10px" }}>
+  //                                     {row.tovar_name}
+  //                                 </TableCell>
+  //                                 <TableCell align="left">{row.name_tovar_1C}</TableCell>
+  //                                 <TableCell align="left">{row.name}</TableCell>
+  //                                 <TableCell align="right">{formatPrice(row.costs)}</TableCell>
+  //                                 <TableCell align="right">{formatPrice(row.costs_NDS)}</TableCell>
+
+  //                                 <TableCell align="left">{formatDate(row.date_prihod)}</TableCell>
+  //                             </TableRow>
+  //                         ))}
+  //                     </TableBody>
+  //                 </Table>
+  //             </TableContainer>
+  //             <TablePagination rowsPerPageOptions={[10, 25, 50, 100]} component="div" count={displayData.length} rowsPerPage={rowsPerPage} page={page} onPageChange={handleChangePage} onRowsPerPageChange={handleChangeRowsPerPage} labelRowsPerPage="Кількість рядків на сторінці" labelDisplayedRows={({ from, to, count }) => `${from}–${to} із ${count}`} />
+  //         </Paper>
+  //     </Box>
+  // ) : (isSearched && !originalResults) ? (
+  //     <Typography sx={{ mt: 3 }}>Результати не знайдено</Typography>
+  // ) : (
+  //     ""
+  // );
+
+  if (loading) {
+    return <Loader />;
+  }
+
+  if (!isSearched) {
+    return null;
+  }
+
+  if (isSearched && !originalResults.length) {
+    return <Typography sx={{ mt: 3 }}>Результати не знайдено</Typography>;
+  }
+
+  return (
     <Box sx={{ width: "100%" }}>
       <Paper sx={{ width: "100%", mb: 2, border: "1px solid #d1d5db" }}>
         <EnhancedTableToolbar numSelected={selected.length} />
@@ -254,7 +297,7 @@ export default function ResultGrid() {
           <Table
             sx={{ minWidth: 750 }}
             aria-labelledby="tableTitle"
-            size={"medium"}
+            size="medium"
           >
             <EnhancedTableHead
               numSelected={selected.length}
@@ -265,35 +308,44 @@ export default function ResultGrid() {
               rowCount={displayData.length}
             />
             <TableBody>
-              {visibleRows.map((row, index) => (
-                <TableRow
-                  key={row.__index}
-                  sx={
-                    index % 2 === 0
-                      ? { background: "#eee" }
-                      : { background: "#fff" }
-                  }
-                  hover
-                >
-                  <TableCell
-                    component="th"
-                    scope="row"
-                    sx={{ paddingLeft: "10px" }}
+              {displayData.length > 0 ? (
+                visibleRows.map((row, index) => (
+                  <TableRow
+                    key={row.__index}
+                    sx={
+                      index % 2 === 0
+                        ? { background: "#eee" }
+                        : { background: "#fff" }
+                    }
+                    hover
                   >
-                    {row.tovar_name}
-                  </TableCell>
-                  <TableCell align="left">{row.name_tovar_1C}</TableCell>
-                  <TableCell align="left">{row.name}</TableCell>
-                  <TableCell align="right">{formatPrice(row.costs)}</TableCell>
-                  <TableCell align="right">
-                    {formatPrice(row.costs_NDS)}
-                  </TableCell>
-
-                  <TableCell align="left">
-                    {formatDate(row.date_prihod)}
+                    <TableCell
+                      component="th"
+                      scope="row"
+                      sx={{ paddingLeft: "10px" }}
+                    >
+                      {row.tovar_name}
+                    </TableCell>
+                    <TableCell align="left">{row.name_tovar_1C}</TableCell>
+                    <TableCell align="left">{row.name}</TableCell>
+                    <TableCell align="right">
+                      {formatPrice(row.costs)}
+                    </TableCell>
+                    <TableCell align="right">
+                      {formatPrice(row.costs_NDS)}
+                    </TableCell>
+                    <TableCell align="left">
+                      {formatDate(row.date_prihod)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} align="center">
+                    Немає результатів за поточними фільтрами
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </TableContainer>

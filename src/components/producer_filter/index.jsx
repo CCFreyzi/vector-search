@@ -7,7 +7,7 @@ import Select from "@mui/material/Select";
 import Checkbox from "@mui/material/Checkbox";
 import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
-import { useResult } from "../../context/ResultContext";
+import { useResult } from "../../context/result_context";
 import { sx } from "./style";
 import mixpanel from "mixpanel-browser";
 

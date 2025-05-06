@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import Box from "@mui/material/Box";
 import Slider from "@mui/material/Slider";
 import Typography from "@mui/material/Typography";
-import { useResult } from "../../context/ResultContext";
+import { useResult } from "../../context/result_context";
 import { sx } from "./styles";
 import mixpanel from "mixpanel-browser";
 
